@@ -1,9 +1,11 @@
 # qRadar for YSFLIGHT
 Welcome! This is the release, and source of qRadar for [YSFlight](ysflight.com).
 
+[![Youtube video](https://img.youtube.com/vi/J6VuIdntqiE/0.jpg)](https://www.youtube.com/watch?v=J6VuIdntqiE)
+Demo of YSRADAR v0.0.9
 [Visit the YSFHQ forum here](ysfhq.com) 
 
-Current version - 0.0.9
+Current version - v0.0.9
 ![enter image description here](https://github.com/Skipper-is/YS-qRadar/blob/main/images/UI.png?raw=true)
 *DISCLAIMER: I am not a programmer, my code is messy, and got messier as I got more and more tired towards the end of this project!* 
 ## Feature List
@@ -46,7 +48,9 @@ The release under /dist/qRadar.exe is self standing and doesn't have any depende
 
 ## Notices
  This code uses QT for GUI
+ 
  Some icons are from Yusuke Kamiyamane, Licenced under CC BY 3.0
+
  Other icons are from Ionicons.
  
 > Written with [StackEdit](https://stackedit.io/).

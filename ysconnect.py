@@ -277,7 +277,7 @@ class YSConnect:
             self.sock.connect((self.host, self.port))
         except socket.error as msg:
             print("Connection Failed")
-            self.callback("Connection Failed, have you used the correct address?")
+            self.callback("Connection Failed, have you used the correct address?\n"+str(msg))
             return False
         except:
             print("Connection Failed")

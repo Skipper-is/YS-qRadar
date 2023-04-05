@@ -1,10 +1,17 @@
-from PyQt5.QtWidgets import QGraphicsScene, QGraphicsView, QApplication, QDialog, QGridLayout, QPushButton, QSizePolicy, QWidget, QLineEdit,QComboBox, QTabWidget,QFrame
-from PyQt5.QtWidgets import QMainWindow, QAction, QLabel,QHBoxLayout, QGraphicsRectItem, QGraphicsEllipseItem, QStatusBar, QGraphicsPolygonItem, QCheckBox,QVBoxLayout
-from PyQt5.QtWidgets import QSplitter, QToolButton, QScrollArea
-from PyQt5.QtWidgets import QGraphicsLineItem, QGraphicsItem, QGraphicsItemGroup, QFrame, QGraphicsTextItem, QTableWidget, QHeaderView, QTableWidgetItem, QFileDialog, QSpacerItem, QMessageBox
-from PyQt5.QtGui import QIcon, QColor, QPalette, QBrush, QPen, QFont, QTransform, QPainterPath, QWheelEvent, QPolygonF,QPainter, QMouseEvent
-from PyQt5.QtCore import Qt, QSize, QRectF, QTimer, QPointF, QPoint, QEvent
+from PyQt5.QtWidgets import (QApplication, QDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
+                             QPushButton, QSizePolicy, QSplitter, QTabWidget, QToolButton, QVBoxLayout, QWidget,
+                             QGraphicsView, QGraphicsScene, QGraphicsRectItem, QGraphicsEllipseItem, QGraphicsPolygonItem,
+                             QCheckBox, QStatusBar, QFrame, QGraphicsLineItem, QGraphicsItem, QGraphicsItemGroup,
+                             QGraphicsTextItem, QTableWidget, QHeaderView, QTableWidgetItem, QFileDialog, QSpacerItem,
+                             QMessageBox, QScrollArea, QComboBox, QAction)
+
+from PyQt5.QtGui import (QIcon, QColor, QPalette, QBrush, QPen, QFont, QTransform, QPainterPath, QPolygonF, QPainter,
+                         QMouseEvent, QWheelEvent)
+
+from PyQt5.QtCore import (Qt, QSize, QRectF, QTimer, QPointF, QPoint, QEvent)
+
 from PyQt5.QtSvg import QSvgRenderer
+
 from PyQt5 import uic
 import sys, _thread, json, configparser, os, math, threading
 from queue import Queue
@@ -22,7 +29,7 @@ basemapLines = []
 basemapRegions = []
 basemapPoints = []
 
-version = "0.0.9"
+version = "0.0.10"
 
 
 class MainWindow(QMainWindow):

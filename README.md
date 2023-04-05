@@ -8,7 +8,7 @@ Welcome! This is the release, and source of qRadar for [YSFlight](ysflight.com).
 
 [Visit the YSFHQ forum here](ysfhq.com) 
 
-Current version - v0.0.9
+Current version - v0.0.11
 ![enter image description here](https://github.com/Skipper-is/YS-qRadar/blob/main/images/UI.png?raw=true)
 *DISCLAIMER: I am not a programmer, my code is messy, and got messier as I got more and more tired towards the end of this project!* 
 ## Feature List

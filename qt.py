@@ -19,6 +19,7 @@ import ysconnect as ys
 from FieldParser import FieldParser as fp
 import resources
 import qdarktheme
+
 navigationPoints = {}
 aircrafts = {}
 userList = {}
@@ -29,27 +30,48 @@ basemapLines = []
 basemapRegions = []
 basemapPoints = []
 
-version = "0.0.10"
+
+version = "0.0.11"
 
 
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
         self.setWindowTitle("YS QRadar")
+        
+        #Flight director, he's vital
+        self.flightDirector = FlightDirector(self)
+        
         #Layout
-        self.mapWindow = MapWindow(self)
-        
         self.layout = QSplitter(Qt.Horizontal)
-        
-        
 
-        self.menu_window = MenuWindow(self)
+        #Sub windows        
+        self.mapWindow = MapWindow(self)
+        self.menuWindow = MenuWindow(self)
+        self.config = Config(self)
+        self.login = LoginForm(self)
+
+        #Get references to the widgets in the sub windows
+        self.tableWidget = self.menuWindow.aircraftList
+        self.userTable = self.menuWindow.userTable
+        self.messageLog = self.menuWindow.messageLog
+        self.mapScene = self.mapWindow.scene
+        self.mapView = self.mapWindow.view
+        self.mapWidth = self.mapWindow.view.geometry().width()
+        self.mapHeight = self.mapWindow.geometry().height()
+
+
+        #Get references to the groups in the map window
+        self.basemapGroup = self.mapWindow.basemapGroup
+        self.taxiwayGroup = self.mapWindow.taxiwayGroup
+        self.navGroup = self.mapWindow.navGroup
+        self.userWaypointsGroup = self.mapWindow.userWaypoints
+        self.userLinesGroup = self.mapWindow.userLines
+
+        #Add the sub windows to the layout
         self.layout.addWidget(self.mapWindow)
-        self.layout.addWidget(self.menu_window)
+        self.layout.addWidget(self.menuWindow)
         self.layout.setSizes([500, 100])
-
-        # widget = QWidget()
-        # widget.setLayout(layout)
         self.setCentralWidget(self.layout)
 
         #Main menu buttons
@@ -75,9 +97,6 @@ class MainWindow(QMainWindow):
         importLines = QAction( "Import Lines", self)
         importLines.setStatusTip("Import lines from a geojson file")
         importLines.triggered.connect(self.importLines)
-
-
-
         
         #Menu bar
         menu = self.menuBar()
@@ -96,15 +115,12 @@ class MainWindow(QMainWindow):
         about_menu.addAction("Info", self.about)
         about_menu.addAction("Help", self.help)
 
-
-
-
-
         #Status bar
         self.statusBar = QStatusBar()
         self.setStatusBar(self.statusBar)
-        flightDirector.subscribeToMessage(self.statusBarUpdate)
+        self.flightDirector.subscribeToMessage(self.statusBarUpdate)
 
+        
         #Coordinates display on status bar
         self.coordinatesLabel = QLabel("Coordinates: N/A")
         self.statusBar.addPermanentWidget(self.coordinatesLabel)
@@ -113,7 +129,11 @@ class MainWindow(QMainWindow):
         self.mapLabel = QLabel("Map: N/A")
         self.statusBar.addPermanentWidget(self.mapLabel)
 
+        self.statusBar.addPermanentWidget(QLabel("Version: "+version))
+
         self.fieldParser = fp()
+
+        self.show()
 
     def statusBarUpdate(self, message):
         if type(message)== list:
@@ -126,14 +146,14 @@ class MainWindow(QMainWindow):
         
 
     def closeEvent(self, event):
-        flightDirector.disconnect()
+        self.flightDirector.disconnect()
         self.mapWindow.close()
 
     def loginForm(self):
-        login.show()
+        self.login.show()
     
     def disconnect(self):
-        flightDirector.disconnect()
+        self.flightDirector.disconnect()
 
     def loadMap(self):
         options = QFileDialog.Options()
@@ -142,11 +162,11 @@ class MainWindow(QMainWindow):
             
             self.file = files
             threading.Thread(target=self.fieldParser.Load, args=(self.file, self.mapLoadedCallback)).start()
-            flightDirector.incomingMessage("Loading map...")
+            self.flightDirector.incomingMessage("Loading map...")
 
     def saveGeoJSON(self):
         if not self.fieldParser.processed:
-            flightDirector.incomingMessage("You need to load a map first!")
+            self.flightDirector.incomingMessage("You need to load a map first!")
             print("You need to load a map first!")
             return
         else:
@@ -155,12 +175,12 @@ class MainWindow(QMainWindow):
             if files:
                 with open(files, 'w') as outfile:
                     json.dump(getGeoJSON("Polygon"), outfile)
-                flightDirector.incomingMessage("GeoJSON saved!")
+                self.flightDirector.incomingMessage("GeoJSON saved!")
 
 
     def mapLoadedCallback(self):
 
-        flightDirector.mapLoaded = True
+        self.flightDirector.mapLoaded = True
 
     def importWaypoints(self):
         options = QFileDialog.Options()
@@ -173,8 +193,8 @@ class MainWindow(QMainWindow):
                         waypoint = WaypointSymbol()
                         waypoint.setPos(feature["geometry"]["coordinates"][0], -feature["geometry"]["coordinates"][1])
                         waypoint.name = feature["properties"]["name"]
-                        waypoint.setParentItem(userWaypointsGroup)
-                        mapScene.addItem(waypoint)
+                        waypoint.setParentItem(self.userWaypointsGroup)
+                        self.mapScene.addItem(waypoint)
 
     def importLines(self):
         options = QFileDialog.Options()
@@ -206,8 +226,8 @@ class MainWindow(QMainWindow):
                         else:
                             line.width = 1
                         
-                        line.setParentItem(userLinesGroup)
-                        mapScene.addItem(line)
+                        line.setParentItem(self.userLinesGroup)
+                        self.mapScene.addItem(line)
                         
     def about(self):
         about = QMessageBox()
@@ -232,7 +252,7 @@ class MainWindow(QMainWindow):
 
 
 class Config():
-    def __init__(self):
+    def __init__(self, parent=None):
         self.config = configparser.ConfigParser()
         self.config.read('config.ini')
         #Check if the defaults are set, if not, set them.
@@ -294,11 +314,11 @@ class LoginForm(QDialog):
         self.parent = parent
         self.setMaximumSize(300, 200)
         #Get defaults from config
-        ysflightVersions = config.getVersions()
-        port = config.getPort()
-        host = config.getHost()
-        username = config.getUsername()
-        defaultVersion = config.getDefaultVersion()
+        ysflightVersions = self.parent.config.getVersions()
+        port = self.parent.config.getPort()
+        host = self.parent.config.getHost()
+        username = self.parent.config.getUsername()
+        defaultVersion = self.parent.config.getDefaultVersion()
 
         #Buttons and textedit
         #Username box
@@ -346,9 +366,9 @@ class LoginForm(QDialog):
     def loginClicked(self):
         
         #Save the configs
-        config.setHost(self.host.text())
-        config.setPort(self.port.text())
-        config.setDefaultVersion(self.version.currentText())
+        self.parent.config.setHost(self.host.text())
+        self.parent.config.setPort(self.port.text())
+        self.parent.config.setDefaultVersion(self.version.currentText())
 
 
         if self.port.text() == "":
@@ -371,13 +391,13 @@ class ConnectingWidget(QDialog):
         self.parent = parent
         self.host = host
         self.port = port
-        flightDirector.connect(self.host, self.port, 'radar', int(version))
+        self.parent.flightDirector.connect(self.host, self.port, 'radar', int(version))
         self.messageCount = 0
         #Buttons and textedit
         self.connectingLabel = QLabel("Connecting to " + self.host + ":" + self.port)
         self.connectingLabel.setAlignment(Qt.AlignCenter)
         self.message = QLabel("Please wait...")
-        self.subscription = flightDirector.subscribeToMessage(self.getMessageUpdate)
+        self.subscription = self.parent.flightDirector.subscribeToMessage(self.getMessageUpdate)
 
         
 
@@ -392,8 +412,8 @@ class ConnectingWidget(QDialog):
         if type(label) == str:
             self.messageCount += 1
             self.message.setText(str(self.messageCount)+": " + label)
-        if flightDirector.connected:
-            flightDirector.unsubscribeToMessage(self.subscription)
+        if self.parent.flightDirector.connected:
+            self.parent.flightDirector.unsubscribeToMessage(self.subscription)
             self.accept()
 
 
@@ -405,6 +425,7 @@ class MapWindow(QWidget):
         self._zoom = 1
         self.currentSceneScale = 1
         self.setParent(parent)
+        self.mainWindow = parent
         #Set a graphics scene
         self.scene = QGraphicsScene()
         self.scene.setBackgroundBrush(QBrush(QColor(0,0,68)))
@@ -657,7 +678,7 @@ class MapWindow(QWidget):
         if (event.type() == QEvent.MouseMove and source is self.view.viewport()):
             position = event.pos()
             localPosition = self.view.mapToScene(position)
-            mainWindow.coordinatesLabel.setText("x: " + str(int(localPosition.x())) + " y: " + str(-int(localPosition.y())))
+            self.mainWindow.coordinatesLabel.setText("x: " + str(int(localPosition.x())) + " y: " + str(-int(localPosition.y())))
             #That updates the position in the bottom status bar.
 
             if self.clickCount == 1:
@@ -679,7 +700,7 @@ class MapWindow(QWidget):
             self.mapHighlightedObject = plane #Otherwise, set the current plane as the highlighted one
             plane.clicked = not plane.clicked
             plane.update()
-            updateAircraftOnMap(plane.parent)
+            updateAircraftOnMap(self.mainWindow, plane.parent)
 
     def updatePath(self):
         if not self.lastPos.isNull() and not self.newpos.isNull():
@@ -698,6 +719,7 @@ class MapWindow(QWidget):
 class MenuWindow(QWidget):
     def __init__(self, parent=None):
         super(MenuWindow, self).__init__(parent)
+        self.parent = parent
         #Set up window tabs
         self.tabs = QTabWidget()
         #self.mapControlsTab = QWidget()
@@ -707,32 +729,39 @@ class MenuWindow(QWidget):
         self.timerEvent.start(1000)
 
         #uic.loadUi("mapControlsMenu.ui", self.mapControlsTab)
-
-        self.aircraftlistTab = QTableWidget()
-        self.aircraftlistTab.setEditTriggers(self.aircraftlistTab.NoEditTriggers)
-        self.aircraftinfoTab = QWidget()
+        self.aircraftListTab = QWidget()
+        self.aircraftList = QTableWidget()
+        self.aircraftList.setEditTriggers(self.aircraftList.NoEditTriggers)
+        self.aircraftInfoBox = QWidget()
         self.userlistTab = QWidget()
         self.messageLogTab = QWidget()
         self.tabs.resize(300,200)
-        self.parent = parent
+        
+        self.flightDirector = self.parent.flightDirector
 
         #Add tabs
-        #self.tabs.addTab(self.mapControlsTab,"Map Controls") #Disabled for now, it was a display for the map controls.
-        self.tabs.addTab(self.aircraftlistTab,"Aircraft List")
-        self.tabs.addTab(self.aircraftinfoTab,"Aircraft Info")
+        
+        self.tabs.addTab(self.aircraftListTab,"Aircraft List")
         self.tabs.addTab(self.userlistTab,"User List")
         self.tabs.addTab(self.messageLogTab,"Message Log")
         
 
 
-        
-        self.aircraftlistTab.setColumnCount(5)
+        self.aircraftListTab.layout = QVBoxLayout()
+        self.aircraftListTab.setLayout(self.aircraftListTab.layout)
+        self.aircraftList.setColumnCount(5)
+        self.aircraftList.setHorizontalHeaderLabels(["Callsign", "Altitude", "Speed (kts)", "Heading","ID"])
+        id_column = self.aircraftList.columnCount() -1
+        self.aircraftList.setColumnHidden(id_column, True)
+        self.aircraftListTab.layout.addWidget(self.aircraftList)
+        self.aircraftList.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.aircraftList.cellClicked.connect(self.aircraftListClicked)
 
-        self.aircraftlistTab.setHorizontalHeaderLabels(["Callsign", "Altitude", "Speed (kts)", "Heading","ID"])
-        id_column = self.aircraftlistTab.columnCount() -1
-        self.aircraftlistTab.setColumnHidden(id_column, True)
-        header = self.aircraftlistTab.horizontalHeader().sectionResizeMode(QHeaderView.ResizeToContents)
-        self.aircraftlistTab.cellClicked.connect(self.aircraftlistTabClicked)
+        self.aircraftListTab.layout.addWidget(QLabel("Aircraft Info:", styleSheet='font-weight: bold;'))
+        self.aircraftListTab.layout.addWidget(self.aircraftInfoBox)
+        
+
+
         
         self.userlistTab.layout = QGridLayout()
         self.userlistTab.setLayout(self.userlistTab.layout)
@@ -743,35 +772,30 @@ class MenuWindow(QWidget):
         self.userTable.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
 
-        layout = QHBoxLayout()
 
-        layout.addWidget(self.tabs)
-        self.setLayout(layout)
 
         
         #Set up aircraft info tab:
-        self.aircraftinfoTab.layout = QGridLayout()
-        
-        self.aircraftinfoTab.setLayout(self.aircraftinfoTab.layout)
-        
-        self.aircraftinfoTab.layout.addWidget(QLabel("Callsign:"), 0, 0)
+        self.aircraftInfoBox.layout = QGridLayout()
+        self.aircraftInfoBox.setLayout(self.aircraftInfoBox.layout)
+        self.aircraftInfoBox.layout.addWidget(QLabel("Callsign:", styleSheet='font-weight: bold;'), 0, 0)
         self.callsignLabel = QLabel("N/A")
-        self.aircraftinfoTab.layout.addWidget(self.callsignLabel, 0, 1)
-        self.callSignEditButton = QPushButton(QIcon(":icons/pencil-button.png"), "Edit", self)
+        self.aircraftInfoBox.layout.addWidget(self.callsignLabel, 0, 1)
+        self.callSignEditButton = QPushButton(QIcon(":icons/pencil-button.png"), "Edit Callsign", self)
         self.callSignEditButton.clicked.connect(self.editCallsign)
-        self.aircraftinfoTab.layout.addWidget(self.callSignEditButton, 0, 2)
-        self.aircraftinfoTab.layout.addWidget(QLabel("Username:"), 1, 0)
+        self.aircraftInfoBox.layout.addWidget(self.callSignEditButton, 0, 2)
+        self.aircraftInfoBox.layout.addWidget(QLabel("Username:", styleSheet='font-weight: bold;'), 1, 0)
         self.usernameLabel = QLabel("N/A")
-        self.aircraftinfoTab.layout.addWidget(self.usernameLabel, 1, 1)
-        self.aircraftinfoTab.layout.addWidget(QLabel("Altitude:"), 2, 0)
+        self.aircraftInfoBox.layout.addWidget(self.usernameLabel, 1, 1)
+        self.aircraftInfoBox.layout.addWidget(QLabel("Altitude:", styleSheet='font-weight: bold;'), 2, 0)
         self.altitudeLabel = QLabel("N/A")
-        self.aircraftinfoTab.layout.addWidget(self.altitudeLabel, 2, 1)
-        self.aircraftinfoTab.layout.addWidget(QLabel("Speed:"), 3, 0)
+        self.aircraftInfoBox.layout.addWidget(self.altitudeLabel, 2, 1)
+        self.aircraftInfoBox.layout.addWidget(QLabel("Speed:", styleSheet='font-weight: bold;'), 3, 0)
         self.speedLabel = QLabel("N/A")
-        self.aircraftinfoTab.layout.addWidget(self.speedLabel, 3, 1)
-        self.aircraftinfoTab.layout.addWidget(QLabel("Heading:"), 4, 0)
+        self.aircraftInfoBox.layout.addWidget(self.speedLabel, 3, 1)
+        self.aircraftInfoBox.layout.addWidget(QLabel("Heading:", styleSheet='font-weight: bold;'), 4, 0)
         self.headingLabel = QLabel("N/A")
-        self.aircraftinfoTab.layout.addWidget(self.headingLabel, 4, 1)
+        self.aircraftInfoBox.layout.addWidget(self.headingLabel, 4, 1)
 
         #Set up message log tab
         self.messageLogTab.layout = QVBoxLayout()
@@ -781,11 +805,15 @@ class MenuWindow(QWidget):
         self.messageLogScroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.messageLogScroll.setWidgetResizable(True)
         self.messageLogTab.layout.addWidget(self.messageLogScroll)
+        self.messageLogScrollContent = QWidget()
+        self.messageLogScroll.setWidget(self.messageLogScrollContent)
         self.messageLog = QVBoxLayout()
         self.messageLog.addStretch()
-        self.messageLogScroll.setLayout(self.messageLog)
+        self.messageLog.setAlignment(Qt.AlignTop)
+        self.messageLogScrollContent.setLayout(self.messageLog)
 
         self.sendLayout = QHBoxLayout()
+        
         self.messageLogTab.layout.addLayout(self.sendLayout)
         self.messageInput = QLineEdit()
         self.messageInput.returnPressed.connect(self.sendMessage)
@@ -794,15 +822,21 @@ class MenuWindow(QWidget):
         self.sendLayout.addWidget(self.sendButton)
         self.sendButton.clicked.connect(self.sendMessage)
 
+
+        layout = QHBoxLayout()
+
+        layout.addWidget(self.tabs)
+        self.setLayout(layout)
+
     def editCallsign(self):
         if self.parent.mapWindow.mapHighlightedObject:
 
             self.editCallsignDialog = EditCallsignDialog(self.parent.mapWindow.mapHighlightedObject)
             self.editCallsignDialog.show()
 
-    def aircraftlistTabClicked(self, row, column):
+    def aircraftListClicked(self, row, column):
         #Get the id from the table
-        id = self.aircraftlistTab.item(row, 4).text()
+        id = self.aircraftList.item(row, 4).text()
         #Get the aircraft associated with the id
 
         aircaft = aircrafts[int(id)]
@@ -812,24 +846,25 @@ class MenuWindow(QWidget):
     def sendMessage(self):
         message = self.messageInput.text()
         if message != "":
-            message = '(' + flightDirector.username + ") " + message
-            flightDirector.sendMessage(message)
+            message = '(' + self.flightDirector.username + ") " + message
+            self.flightDirector.sendMessage(message)
             self.messageInput.setText("")
 
     def receiveMessages(self):
-        messages = flightDirector.messageList
+        messages = self.flightDirector.messageList
         for message in messages:
             self.receiveMessage(message)
-        flightDirector.messageList = []
+        self.flightDirector.messageList = []
 
     def receiveMessage(self, message):
         messageContainer = QLabel(message)
-        messageContainer.sizePolicy().setVerticalPolicy(QSizePolicy.Minimum)
-        messageContainer.minimumHeight = 20
+        messageContainer.setWordWrap(True)
         self.messageLog.addWidget(messageContainer)
-        rowCount = len(self.messageLog.children())
-        if rowCount > 25:
-            self.messageLog.removeWidget(self.messageLog.children()[0])
+        #Check that the message log isn't over 50 messages long, otherwise delete the first one
+        rowCount = self.messageLog.count()
+        if rowCount > 50:
+            self.messageLog.itemAt(1).widget().setParent(None)
+            self.messageLog.itemAt(1).widget().deleteLater()
 
 
 class EditCallsignDialog(QDialog):
@@ -856,68 +891,82 @@ class EditCallsignDialog(QDialog):
 
 
 class PlaneSymbol(QGraphicsItem):
+    """
+    A class representing a plane symbol in a radar display.
+    """
+
     def __init__(self, parent=None):
         super(PlaneSymbol, self).__init__(parent)
         self.speed = 0
         self.heading = 0
         self.altitude = 0
         self.callsign = ""
-        self.setFlag(QGraphicsItem.ItemIgnoresTransformations)
+        
+        self.setFlag(QGraphicsItem.ItemIgnoresTransformations,True)
         self.clicked = False
         self.change = 0
         self.parent = parent
 
     def boundingRect(self):
         if self.clicked:
-            rectangle = QRectF(-100,-100,200,200)
+            rectangle = QRectF(-100, -100, 200, 200)
         else:
-            rectangle = QRectF(-25,-25,50,50)
+            rectangle = QRectF(-25, -25, 50, 50)
         return rectangle
-    
+
     def paint(self, painter, option, widget):
 
         if self.clicked:
             painter.setPen(QPen(Qt.red))
-
         else:
             painter.setPen(QPen(Qt.white))
-        painter.rotate((self.heading-90))
-        painter.drawRect(-2.5,-2.5,5,5)
+
+        painter.rotate((self.heading - 90))
+        painter.drawRect(-2.5, -2.5, 5, 5)
+
         if self.clicked:
             dashedPen = QPen(Qt.red)
         else:
             dashedPen = QPen(Qt.white)
+
         dashedPen.setWidth(1)
         dashedPen.setStyle(Qt.DashLine)
         painter.setPen(dashedPen)
-        painter.drawLine(5,0,10,0)
-        painter.rotate(-(self.heading-90))
+        painter.drawLine(5, 0, 10, 0)
+        painter.rotate(-(self.heading - 90))
+
         painter.setFont(QFont("Arial", 8))
-        painter.drawText(6,10,self.callsign)
-        painter.drawText(6,18,'FL'+ mToFL(self.altitude))
+        painter.drawText(6, 10, self.callsign)
+        painter.drawText(6, 18, 'FL' + mToFL(self.altitude))
         painter.setPen(QPen(Qt.white))
+
         arrowsvg = QSvgRenderer(":icons/arrow.svg")
-        if self.change > 0: # climbing
-            arrowsvg.render(painter, QRectF(0,8,4,8))
-        elif self.change < 0: # descending
+
+        if self.change > 0:  # climbing
+            arrowsvg.render(painter, QRectF(0, 8, 4, 8))
+        elif self.change < 0:  # descending
             painter.rotate(180)
-            arrowsvg.render(painter, QRectF(-4,-16,4,8))
+            arrowsvg.render(painter, QRectF(-4, -16, 4, 8))
             painter.rotate(-180)
-        painter.drawText(6,28,str(int(self.speed*1.94384)) + 'kts')
+
+        painter.drawText(6, 28, str(int(self.speed * 1.94384)) + 'kts')
+
         if self.clicked:
             painter.setPen(QPen(Qt.white))
             svg = QSvgRenderer(":icons/compass.svg")
-            svg.render(painter, QRectF(-100,-100,200,200))
-             
+            svg.render(painter, QRectF(-100, -100, 200, 200))
+
 
 class GroundSymbol(QGraphicsItem):
+    """
+    A class representing a ground nav symbol in a radar display.
+    """
     def __init__(self, parent=None):
         super(GroundSymbol, self).__init__(parent)
         self.id = 0
         self.type = ""
         self.name = ""
         self.rotation = 0
-        
         self.setFlag(QGraphicsItem.ItemIgnoresTransformations)
     
     def boundingRect(self):
@@ -955,13 +1004,14 @@ class GroundSymbol(QGraphicsItem):
 class Basemap(QGraphicsItem):
     def __init__(self, parent=None):
         super(Basemap, self).__init__(parent)
+        self.parent = parent
         
 
     def boundingRect(self):
         if self.childItems:
             rectangle = self.childrenBoundingRect()
         else:
-            rectangle = QRectF(0,0,mapWidth,mapHeight)
+            rectangle = QRectF(0,0,self.parent.mapWidth,self.parent.mapHeight)
         return rectangle
     
     def paint(self, painter, option, widget):
@@ -1073,7 +1123,9 @@ class User():
 class FlightDirector():
     """The MVP of the module. This guy does all the heavy lifting and directing. He's the boss, although he's quite over worked. Deals with all the incoming messages and updates the map accordingly,
     also handles the messy business of dealing with the threads, which are generally a nightmare."""
-    def __init__(self):
+    def __init__(self, parent=None):
+        self.parent = parent
+        self.mainWindow = parent
         self.client = None
         self.connected = False
         self.client = ys.YSConnect(self.incomingMessage)
@@ -1116,10 +1168,10 @@ class FlightDirector():
     def update(self):
         #Update every 5 seconds
         if self.connected:
-            updateUsers(self.client.getUsers())
-            updatePlanes(self.client.getPlanes(), self.client.getNavPoints())
+            updateUsers(self.mainWindow.userTable, self.client.getUsers())
+            updatePlanes(self.mainWindow, self.client.getPlanes(), self.client.getNavPoints())
         if self.mapLoaded:
-            updateBasemap()
+            updateBasemap(self.mainWindow)
             self.mapLoaded = False
 
     def sendMessage(self, message):
@@ -1170,7 +1222,7 @@ def drawGrid(scene,number,gap,origin):
     pen.setStyle(Qt.DashLine)
     
     #For horizontal lines:
-    length = mapWidth
+    length = scene.width()
     startOffset = origin[1] - (gap*number/2)
     for i in range(0,number):
         line = QGraphicsLineItem(0,0,length,0)
@@ -1179,7 +1231,7 @@ def drawGrid(scene,number,gap,origin):
         scene.addItem(line)
     
     #For vertical lines:
-    length = mapHeight
+    length = scene.height()
     startOffset = origin[0] - (gap*number/2)
     for i in range(0,number):
         line = QGraphicsLineItem(0,0,0,length)
@@ -1187,7 +1239,7 @@ def drawGrid(scene,number,gap,origin):
         line.setPen(pen)
         scene.addItem(line)
 
-def updateUsers(newUserList):
+def updateUsers(userTable, newUserList):
     for user in newUserList.getUsers():
         if user.deleteFlag: #Remove the user if they've been flagged as to delete. 
             if user.tableRow != None:
@@ -1222,7 +1274,9 @@ def setTableCellColourFromIFF(tableCell, iff):
     colours = [QColor(0,0,255), QColor(255,0,0), QColor(0,128,0), QColor(255,0,255)]
     tableCell.setBackground(colours[iff])
 
-def updatePlanes(planes, navs):
+def updatePlanes(mainWindow, planes, navs):
+    mapScene = mainWindow.mapScene
+    tableWidget = mainWindow.tableWidget
     tempAircrafts = {}
     tempNavs = {}
     for id in planes:
@@ -1252,7 +1306,7 @@ def updatePlanes(planes, navs):
             plane.parent = aircrafts[key]
             aircrafts[key].symbol = plane
             mapScene.addItem(plane)
-            updateAircraftOnMap(aircrafts[key])
+            updateAircraftOnMap(mainWindow,aircrafts[key])
             currentRowCount = tableWidget.rowCount()
             tableWidget.insertRow(currentRowCount)
             tableWidget.setItem(currentRowCount,0,QTableWidgetItem(plane.callsign))
@@ -1301,7 +1355,7 @@ def updatePlanes(planes, navs):
                 tableWidget.item(aircraft.tableRow,2).setText(str(int(msToKnots(aircraft.horizontal_velocity/3.6))))
                 tableWidget.item(aircraft.tableRow,3).setText(str(int(aircraft.heading)))
                 tableWidget.item(aircraft.tableRow,4).setText(str(key))
-            updateAircraftOnMap(aircraft)
+            updateAircraftOnMap(mainWindow,aircraft)
 
         #Process Navs:
     for id in navs:
@@ -1317,7 +1371,7 @@ def updatePlanes(planes, navs):
         if key not in navigationPoints.keys():
             #This plane has been added to the list, so add it to the map
             navigationPoints[key] = tempNavs[key]
-            updateNav(navigationPoints[key])
+            updateNav(mainWindow, navigationPoints[key])
             #Set the bbox from the nav points
             boundingRectangle = mapScene.itemsBoundingRect()
             boundingRectangle.setWidth(boundingRectangle.width()+100)
@@ -1326,7 +1380,7 @@ def updatePlanes(planes, navs):
     
     mainWindow.mapWindow.fitInView()
 
-def updateBasemap():
+def updateBasemap(mainWindow):
     fieldParser = mainWindow.fieldParser
     polygons, lines, points = fieldParser.getGeometry()
     regions = fieldParser.getRegions()
@@ -1347,8 +1401,8 @@ def updateBasemap():
         pen = QPen(colour)
         brush = QBrush(colour)
         
-        mapScene.addPolygon(convertedPolygon, pen, brush).setParentItem(basemapGroup)
-        basemapGroup.update()
+        mainWindow.mapScene.addPolygon(convertedPolygon, pen, brush).setParentItem(mainWindow.basemapGroup)
+        mainWindow.basemapGroup.update()
         
 
     #Add the lines to the map: TODO
@@ -1381,18 +1435,18 @@ def updateBasemap():
                 pen.setWidth(1)
                 pen.setStyle(Qt.DashLine)
         
-        mapScene.addPolygon(convertedPolygon, pen, colour).setParentItem(taxiwayGroup)
-        taxiwayGroup.update()
+        mainWindow.mapScene.addPolygon(convertedPolygon, pen, colour).setParentItem(mainWindow.taxiwayGroup)
+        mainWindow.taxiwayGroup.update()
 
     mainWindow.mapWindow.fitInView()
-    flightDirector.incomingMessage("Map loaded")
+    mainWindow.flightDirector.incomingMessage("Map loaded")
 
-def getGeoJSON(geometryType):
+def getGeoJSON(mainWindow, geometryType):
     fieldParser = mainWindow.fieldParser
     geoJSON = fieldParser.getGeoJSON(geometryType)
     return geoJSON
 
-def updateAircraftOnMap(aircraft):
+def updateAircraftOnMap(mainWindow, aircraft):
     aircraftSymbol  = aircraft.symbol
     aircraftSymbol.setPos(aircraft.x,aircraft.z)
 
@@ -1403,12 +1457,13 @@ def updateAircraftOnMap(aircraft):
     aircraftSymbol.change = aircraft.altitudeChange
     aircraftSymbol.update()
     if aircraftSymbol.clicked:
-        mapView.centerOn(aircraftSymbol)
-        updateAircraftInfo(aircraftSymbol)
-    mapScene.update()
+        mainWindow.mapView.centerOn(aircraftSymbol)
+        updateAircraftInfo(mainWindow.menuWindow,aircraftSymbol)
+    mainWindow.mapScene.update()
 
-def updateNav(nav):
-  
+def updateNav(mainWindow, nav):
+    mapScene = mainWindow.mapScene
+    navGroup = mainWindow.navGroup
     navSymbol = GroundSymbol()
     
     navSymbol.setPos(nav.x,nav.z)
@@ -1434,48 +1489,27 @@ def updateNav(nav):
     mapScene.addItem(navSymbol)
     navSymbol.update()
 
-def updateAircraftInfo(aircraft):
-    sideMenuWindow.callsignLabel.setText(aircraft.callsign)
-    sideMenuWindow.usernameLabel.setText(aircraft.username)
-    sideMenuWindow.altitudeLabel.setText(str(round(aircraft.altitude,0))+ "m/ FL"+str(mToFL(aircraft.altitude)))
-    sideMenuWindow.speedLabel.setText(str(aircraft.speed)+"m/s/ "+str(msToKnots(aircraft.speed))+"kts")
-    sideMenuWindow.headingLabel.setText(str(aircraft.heading))
-                
+def updateAircraftInfo(aircraftInfoBox, aircraft):
+    aircraftInfoBox.callsignLabel.setText(aircraft.callsign)
+    aircraftInfoBox.usernameLabel.setText(aircraft.username)
+    aircraftInfoBox.altitudeLabel.setText(str(round(aircraft.altitude,0))+ "m/ FL"+str(mToFL(aircraft.altitude)))
+    aircraftInfoBox.speedLabel.setText(str(aircraft.speed)+"m/s/ "+str(msToKnots(aircraft.speed))+"kts")
+    aircraftInfoBox.headingLabel.setText(str(aircraft.heading))
+
+class QRadar(QApplication):
+
+    def __init__(self,*args):
+        super().__init__(*args)
+        self.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+        self.setWindowIcon(QIcon(":icons/qRadarLogo.ico"))
+        qdarktheme.setup_theme()
+        self.mainWindow = MainWindow()
+        self.mainWindow.showMaximized()
+        
+        
+
+if __name__ == "__main__":
+    app = QRadar(sys.argv)
+    sys.exit(app.exec_())
 
 
-QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
-app = QApplication(sys.argv)
-app.setWindowIcon(QIcon(":icons/qRadarLogo.ico"))
-qdarktheme.setup_theme()
-flightDirector = FlightDirector()
-mainWindow = MainWindow()
-config = Config()
-login = LoginForm()
-mainWindow.showMaximized()
-mainWindow.show()
-
-mapScene = mainWindow.mapWindow.scene
-mapView = mainWindow.mapWindow.view
-mapWidth = mainWindow.mapWindow.view.geometry().width()
-sideMenuWindow= mainWindow.menu_window
-tableWidget = mainWindow.menu_window.aircraftlistTab
-userTable = mainWindow.menu_window.userTable
-messageLog= mainWindow.menu_window.messageLog
-mapHeight = mainWindow.mapWindow.geometry().height()
-mapWidth = mainWindow.mapWindow.view.geometry().width()
-mapScene.setSceneRect(0,0,mapWidth,mapHeight)
-basemapGroup = mainWindow.mapWindow.basemapGroup
-taxiwayGroup = mainWindow.mapWindow.taxiwayGroup
-navGroup = mainWindow.mapWindow.navGroup
-userWaypointsGroup = mainWindow.mapWindow.userWaypoints
-userLinesGroup = mainWindow.mapWindow.userLines
-
-
-#Scale factor is 1px to 1m, which works out to 1852px per nm. Yea, we need to sort the scale drawing issue.
-drawGrid(mapScene,10,50,(mapWidth/2,mapHeight/2))
-
-
-sys.exit(app.exec_())
-
-
-# TODO: YSConnect - add in update for username for each plane, especially for users that have joined since the last update

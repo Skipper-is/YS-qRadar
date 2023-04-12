@@ -178,9 +178,14 @@ def parseUser(message):
         if len(message) < 8:
             return None
         type = struct.unpack("h",message[0:2])[0]
-        iff = struct.unpack("h",message[2:4])[0]
-        id = struct.unpack("i",message[4:8])[0]
-        name = message[12:-1].decode()
+        if type < 5:
+            iff = struct.unpack("h",message[2:4])[0]
+            id = struct.unpack("i",message[4:8])[0]
+            name = message[12:-1].decode()
+        else: # For some reason, sometimes you get weird messages back, with a type of 30... Which should't be possible.
+            iff = 0
+            id = 0
+            name = None
         return {"name":name,"id":id,"type":type,"iff":iff}
     except:
         return {"name":None,"id":0,"type":0,"iff":0}
@@ -291,7 +296,12 @@ class YSConnect:
         self.sock.send(self.username)
         
         while self.inputs:
-            readable, writable, exceptional = select.select(self.inputs, self.outputs, self.inputs)
+            try:
+                readable, writable, exceptional = select.select(self.inputs, self.outputs, self.inputs)
+            except ValueError:
+                print("Error")
+                self.callback("Error - Likely disconnected.")
+                return False
             for s in readable:
                 if s is self.sock:
                     s = self.sock
@@ -355,7 +365,22 @@ class YSConnect:
                     elif mesgType == "FSNETCMD_ENVIRONMENT":
                         acknowledge(s,readbacks.index("FSNETREADBACK_ENVIRONMENT"))
                         self.callback("Verifying environment")
-                    
+                        if len(message[2])> 8:
+                            day, flags, windX, windVert, windZ, visibility = struct.unpack("IIffff",message[2])
+                            windSpeed = round(math.sqrt(windX**2 + windZ**2) * 1.94384,2) #Convert to knots
+                            print(windSpeed)
+                            print(windX, windZ)
+                            print(math.degrees(math.atan2(windX,windZ)))
+                            windDirection = int(math.degrees(math.atan2(windX,windZ))+180)
+                            if day == 1:
+                                day = "Day"
+                            else:
+                                day = "Night"
+                            returnMessage = ["weather",{"windDirection": windDirection, "windSpeed": windSpeed, "time": day, "visibility": visibility}]
+                            print(returnMessage)
+                            self.callback(returnMessage)
+                        #Parse the packet, and create a weather message to send to the listener. message should be["weather",{"windDirection": windDirection, "windSpeed": windSpeed, "time": time, "visibility": visibility}]
+
                     elif mesgType == "FSNETCMD_LOGON":
                         #Sometimes this is called, sometimes not... Very weird.
                         # Seems to be mainly not called on OpenYS, and ocasionally on 2015xxxx. Have moved the code to prepare, as

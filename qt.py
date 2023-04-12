@@ -3,14 +3,14 @@ from PyQt5.QtWidgets import (QApplication, QDialog, QGridLayout, QHBoxLayout, QL
                              QGraphicsView, QGraphicsScene, QGraphicsRectItem, QGraphicsEllipseItem, QGraphicsPolygonItem,
                              QCheckBox, QStatusBar, QFrame, QGraphicsLineItem, QGraphicsItem, QGraphicsItemGroup,
                              QGraphicsTextItem, QTableWidget, QHeaderView, QTableWidgetItem, QFileDialog, QSpacerItem,
-                             QMessageBox, QScrollArea, QComboBox, QAction)
+                             QMessageBox, QScrollArea, QComboBox, QAction, )
 
 from PyQt5.QtGui import (QIcon, QColor, QPalette, QBrush, QPen, QFont, QTransform, QPainterPath, QPolygonF, QPainter,
-                         QMouseEvent, QWheelEvent)
+                         QMouseEvent, QWheelEvent,)
 
 from PyQt5.QtCore import (Qt, QSize, QRectF, QTimer, QPointF, QPoint, QEvent)
 
-from PyQt5.QtSvg import QSvgRenderer
+from PyQt5.QtSvg import QSvgRenderer, QGraphicsSvgItem
 
 from PyQt5 import uic
 import sys, _thread, json, configparser, os, math, threading
@@ -29,9 +29,10 @@ basemapPolygons = []
 basemapLines = []
 basemapRegions = []
 basemapPoints = []
+serverWeather = None
 
 
-version = "0.0.11"
+version = "0.0.12"
 
 
 class MainWindow(QMainWindow):
@@ -738,12 +739,16 @@ class MenuWindow(QWidget):
         self.tabs.resize(300,200)
         
         self.flightDirector = self.parent.flightDirector
+        self.flightDirector.subscribeToMessage(self.receiveFDMessages)
+
+        self.weatherTab = QWidget()
 
         #Add tabs
         
         self.tabs.addTab(self.aircraftListTab,"Aircraft List")
         self.tabs.addTab(self.userlistTab,"User List")
         self.tabs.addTab(self.messageLogTab,"Message Log")
+        self.tabs.addTab(self.weatherTab,"Weather")
         
 
 
@@ -822,6 +827,49 @@ class MenuWindow(QWidget):
         self.sendLayout.addWidget(self.sendButton)
         self.sendButton.clicked.connect(self.sendMessage)
 
+        #Set up weather tab
+        self.weatherTab.layout = QVBoxLayout()
+        self.weatherTab.setLayout(self.weatherTab.layout)
+        self.weatherTab.layout.addWidget(QLabel("Wind:", styleSheet='font-weight: bold;'))
+        self.weather = None
+        self.windView = QGraphicsView()
+        self.weatherTab.layout.addWidget(self.windView)
+        self.windScene = QGraphicsScene()
+        self.windView.setScene(self.windScene)
+        self.windView.setMinimumHeight(100)
+        self.windView.setMaximumHeight(400)
+
+        #Add the compass to the scenepyqt5 add 
+        compass = QGraphicsSvgItem(":icons/compass.svg")
+        self.windScene.addItem(compass)
+        compass.setPos(0, 0)
+        compass.setScale(2)
+        
+        centrePoint = compass.boundingRect().center()*2
+        
+        self.compassArrow = QGraphicsSvgItem(":icons/compassArrow.svg")
+        compassArrowcentre = self.compassArrow.boundingRect().center()
+        self.compassArrow.setTransformOriginPoint(compassArrowcentre)
+        self.compassArrow.setPos(centrePoint+QPointF(-compassArrowcentre.x(), -compassArrowcentre.y()))
+        self.compassArrow.setRotation(-90)
+        self.windScene.addItem(self.compassArrow)     
+        self.windScene.update()
+        self.windValue = QLabel("N/A")
+        self.weatherDetailsLayout = QGridLayout()
+        self.weatherTab.layout.addLayout(self.weatherDetailsLayout)
+        self.weatherDetailsLayout.addWidget(QLabel("Wind Speed:", styleSheet='font-weight: bold;'), 0, 0)
+        self.weatherDetailsLayout.addWidget(self.windValue, 0, 1)
+
+        self.weatherDetailsLayout.addWidget(QLabel("Time of day: ", styleSheet='font-weight: bold;'), 1, 0)
+        self.timeDetails = QLabel("N/A")
+        self.weatherDetailsLayout.addWidget(self.timeDetails, 1, 1)
+        self.visibilityDetails = QLabel("N/A")
+        self.weatherDetailsLayout.addWidget(QLabel("Visibility: ", styleSheet='font-weight: bold;'), 2, 0)
+        self.weatherDetailsLayout.addWidget(self.visibilityDetails, 2, 1)
+
+
+        self.weatherTab.layout.addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Minimum, QSizePolicy.Expanding))
+
 
         layout = QHBoxLayout()
 
@@ -850,11 +898,12 @@ class MenuWindow(QWidget):
             self.flightDirector.sendMessage(message)
             self.messageInput.setText("")
 
-    def receiveMessages(self):
+    def receiveMessages(self): # This is receiving chat messages
         messages = self.flightDirector.messageList
         for message in messages:
             self.receiveMessage(message)
         self.flightDirector.messageList = []
+        self.updateWeather(self.weather)
 
     def receiveMessage(self, message):
         messageContainer = QLabel(message)
@@ -865,6 +914,28 @@ class MenuWindow(QWidget):
         if rowCount > 50:
             self.messageLog.itemAt(1).widget().setParent(None)
             self.messageLog.itemAt(1).widget().deleteLater()
+    
+    def receiveFDMessages(self, message):
+        if type(message)== list:
+            #Should be a weather message:
+            if message[0] == "weather":
+              self.weather = message[1]
+
+    
+    def updateWeather(self,weather):
+        #Weather dict contains: {"windDirection": windDirection, "windSpeed": windSpeed, "time": time, "visibility": visibility}
+        if weather is None:
+            self.windValue.setText("N/A")
+            self.timeDetails.setText("N/A")
+            self.visibilityDetails.setText("N/A")
+        else:
+            self.windValue.setText(str(weather["windSpeed"]) + " knots")
+            self.timeDetails.setText(str(weather["time"]))
+            self.visibilityDetails.setText(str(round(weather["visibility"]/1852,2)) + "nm / "+ str(round(weather["visibility"]/1000,2)) + "km")
+            self.compassArrow.setRotation(weather["windDirection"]-90)
+            self.windScene.update()
+
+
 
 
 class EditCallsignDialog(QDialog):
@@ -1240,6 +1311,7 @@ def drawGrid(scene,number,gap,origin):
         scene.addItem(line)
 
 def updateUsers(userTable, newUserList):
+    
     for user in newUserList.getUsers():
         if user.deleteFlag: #Remove the user if they've been flagged as to delete. 
             if user.tableRow != None:
@@ -1486,7 +1558,7 @@ def updateNav(mainWindow, nav):
         mapScene.addPolygon(polygonLight,QPen(QColor(255,255,0,255),5)).setParentItem(navGroup)
         mapScene.addPolygon(polygonDark,QPen(QColor(255,255,0,255),5),QBrush(QColor(255,255,0,255))).setParentItem(navGroup)
     navSymbol.setParentItem(navGroup)
-    mapScene.addItem(navSymbol)
+    #mapScene.addItem(navSymbol)
     navSymbol.update()
 
 def updateAircraftInfo(aircraftInfoBox, aircraft):

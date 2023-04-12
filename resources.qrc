@@ -10,6 +10,7 @@
         <file alias="pencil-button.png">icons/pencil-button.png</file>
         <file alias="airplane.png">icons/airplane.png</file>
         <file alias="home.png">icons/home.png</file>
+        <file alias="compassArrow.svg">icons/compassArrow.svg</file>
 
     </qresource>
 </RCC>

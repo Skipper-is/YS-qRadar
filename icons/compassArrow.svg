@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="47.25mm"
+   height="5.8361101mm"
+   viewBox="0 0 47.25 5.83611"
+   version="1.1"
+   id="svg5"
+   inkscape:version="1.1 (c68e22c387, 2021-05-23)"
+   sodipodi:docname="compassArrow.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview7"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:document-units="mm"
+     showgrid="false"
+     inkscape:object-paths="true"
+     inkscape:snap-intersection-paths="true"
+     inkscape:snap-midpoints="true"
+     inkscape:snap-smooth-nodes="true"
+     fit-margin-top="0"
+     fit-margin-left="0"
+     fit-margin-right="0"
+     fit-margin-bottom="0"
+     inkscape:zoom="3.9676549"
+     inkscape:cx="77.501701"
+     inkscape:cy="30.748642"
+     inkscape:window-width="2940"
+     inkscape:window-height="1728"
+     inkscape:window-x="-12"
+     inkscape:window-y="499"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1" />
+  <defs
+     id="defs2">
+    <rect
+       x="122.30592"
+       y="99.999603"
+       width="6.7037606"
+       height="4.2832103"
+       id="rect53527" />
+    <inkscape:path-effect
+       effect="ruler"
+       id="path-effect4800"
+       is_visible="true"
+       lpeversion="1"
+       unit="mm"
+       mark_distance="3.18"
+       mark_length="2.1"
+       minor_mark_length="0.5"
+       major_mark_steps="3"
+       shift="3"
+       offset="0"
+       mark_dir="right"
+       border_marks="both" />
+    <inkscape:path-effect
+       effect="ruler"
+       id="path-effect4638"
+       is_visible="true"
+       lpeversion="1"
+       unit="pc"
+       mark_distance="0.36"
+       mark_length="0.4"
+       minor_mark_length="0.1"
+       major_mark_steps="5"
+       shift="25"
+       offset="0"
+       mark_dir="right"
+       border_marks="both" />
+  </defs>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-20.296719,-18.080508)">
+    <path
+       id="rect1220"
+       style="fill:#808080;stroke:#ffffff;stroke-width:0.1;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:none;stop-color:#000000"
+       d="m 20.346719,20.998562 v -2.868054 0 h 43.523076 l 3.626924,2.868052" />
+    <path
+       id="path1038"
+       style="fill:#ffffff;stroke:#ffffff;stroke-width:0.1;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:none;stop-color:#000000"
+       d="m 67.496719,20.99856 v 0 l -3.626924,2.868056 H 20.346719 v -2.868054" />
+    <ellipse
+       style="fill:#000000;stroke:none;stroke-width:0.1;stroke-linecap:round;stop-color:#000000"
+       id="path1328"
+       cx="43.921719"
+       cy="20.998564"
+       rx="1.6595"
+       ry="1.6592875" />
+  </g>
+</svg>

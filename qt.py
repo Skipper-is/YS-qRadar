@@ -32,7 +32,7 @@ basemapPoints = []
 serverWeather = None
 
 
-version = "0.0.13"
+version = "0.0.14"
 
 
 class MainWindow(QMainWindow):
@@ -1000,7 +1000,7 @@ class PlaneSymbol(QGraphicsItem):
             painter.setPen(QPen(Qt.white))
 
         painter.rotate((self.heading - 90))
-        painter.drawRect(-2.5, -2.5, 5, 5)
+        painter.drawRect(-3, -3, 6, 6)
 
         if self.clicked:
             dashedPen = QPen(Qt.red)
@@ -1021,10 +1021,10 @@ class PlaneSymbol(QGraphicsItem):
         arrowsvg = QSvgRenderer(":icons/arrow.svg")
 
         if self.change > 0:  # climbing
-            arrowsvg.render(painter, QRectF(0, 8, 4, 8))
+            arrowsvg.render(painter, QRectF(0, 8, 8, 16))
         elif self.change < 0:  # descending
             painter.rotate(180)
-            arrowsvg.render(painter, QRectF(-4, -16, 4, 8))
+            arrowsvg.render(painter, QRectF(-8, -24, 8, 16))
             painter.rotate(-180)
 
         painter.drawText(6, 40, str(int(self.speed * 1.94384)) + 'kts')

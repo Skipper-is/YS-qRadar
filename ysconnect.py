@@ -103,7 +103,7 @@ readbacks = ["FSNETREADBACK_ADDAIRPLANE",
 	"FSNETREADBACK_USEUNGUIDEDWEAPON",
 	"FSNETREADBACK_CTRLSHOWUSERNAME"]
 
-navTypes = ["ILS", "VORDME","NDB"]
+navTypes = {'ILS':'ILS', 'VORDME':'VORDME', 'NDB':'NDB'}
 
 def returnYSMessage(connection):
     try:
@@ -218,15 +218,19 @@ def parseGroundObject(message):
         name2 = 'unknown'
     return {"type":type,"id":id,"iff":iff,"x":x,"y":y,"z":z,"yaw":yaw,"pitch":pitch,"roll":roll,"name":name,"name2":name2}
 
-def createRadarPoints(ground_object):
+def createRadarPoints(ground_object, updatednavTypes):
     radarPoint = {}
     if type(ground_object) == type(None):
         return None #If it's empty, return nothing
     if ground_object["type"] == 65537: #Check it is actually a ground object
-        if ground_object["name"] in navTypes: #It is a type of nav point, you can add more at the top in the declaration
+        if ground_object["name"] in updatednavTypes: #It is a type of nav point, you can add more at the top in the declaration
             radarPoint['id'] = ground_object["id"] # Set the ID of the point
-            radarPoint["type"] = ground_object["name"] # Set the type of point as the original name, so ILS, VORDME etc
+            radarPoint["type"] = updatednavTypes[ground_object["name"]] # This will set the type with the simplified nav type. 
+                                                                        #So for example, if a modded nav has come in with the name ILS[CJAP],
+                                                                        #but the type is ILS, it will set the type to ILS.
             radarPoint["name"] = ground_object["name2"] # The name is then set to the name of the nav point - eg HILO
+            if radarPoint["name"].startswith("@") or radarPoint["name"].startswith("B"): #Beacons or ILS/VOR sometimes start with them for the ai nav
+                radarPoint["name"] = radarPoint["name"][1:] # Remove the @ or B
             radarPoint["x"] = ground_object["x"] #Positions....
             radarPoint["y"] = ground_object["y"]
             radarPoint["z"] = -ground_object["z"]
@@ -273,6 +277,7 @@ class YSConnect:
         self.lastStayAlive = time.time()
         self.callback = callback
         self.map = None
+        self.navTypes = navTypes
     
     def connect(self, host, port=7915, username="radar", version=20180930):
         self.username = createLogin(username, version)
@@ -368,16 +373,12 @@ class YSConnect:
                         if len(message[2])> 8:
                             day, flags, windX, windVert, windZ, visibility = struct.unpack("IIffff",message[2])
                             windSpeed = round(math.sqrt(windX**2 + windZ**2) * 1.94384,2) #Convert to knots
-                            print(windSpeed)
-                            print(windX, windZ)
-                            print(math.degrees(math.atan2(windX,windZ)))
                             windDirection = int(math.degrees(math.atan2(windX,windZ))+180)
                             if day == 1:
                                 day = "Day"
                             else:
                                 day = "Night"
                             returnMessage = ["weather",{"windDirection": windDirection, "windSpeed": windSpeed, "time": day, "visibility": visibility}]
-                            print(returnMessage)
                             self.callback(returnMessage)
                         #Parse the packet, and create a weather message to send to the listener. message should be["weather",{"windDirection": windDirection, "windSpeed": windSpeed, "time": time, "visibility": visibility}]
 
@@ -404,7 +405,7 @@ class YSConnect:
                     
                     elif mesgType == "FSNETCMD_ADDOBJECT":
                         groundObject = parseGroundObject(message[2])
-                        radarPoint = createRadarPoints(groundObject)
+                        radarPoint = createRadarPoints(groundObject, self.navTypes)
                         if radarPoint != None:
                             self.navPoints[radarPoint["id"]] = NavPoint(radarPoint)
 
@@ -474,6 +475,11 @@ class YSConnect:
             message = message.encode()
             message = struct.pack("II",len(message)+13,messageTypes.index("FSNETCMD_TEXTMESSAGE")) + struct.pack("II",0,0) + message + b'\x00'
             self.sock.send(message)
+        
+    def updateNavTypes(self, newNavTypes):
+        currentNavs = self.navTypes
+        self.navTypes = {**currentNavs, **newNavTypes}
+
 
 
 class UserList:
@@ -671,8 +677,15 @@ class NavPoint:
         self.y = data["y"]
         self.z = data["z"]
         self.rotation = data["rotation"]
+        self.offset = 0
     
     def getPosition(self):
         return(self.x,self.z)
+    
+    def setOffset(self, offset):
+        self.offset = offset
+    
+    def getOffset(self):
+        return self.offset
 
         

@@ -32,7 +32,7 @@ basemapPoints = []
 serverWeather = None
 
 
-version = "0.0.12"
+version = "0.0.13"
 
 
 class MainWindow(QMainWindow):
@@ -135,6 +135,10 @@ class MainWindow(QMainWindow):
         self.fieldParser = fp()
 
         self.show()
+
+        #Add the ground object list to the flight director's ysconnect.
+        self.flightDirector.updateNavTypes(self.config.groundFeatures)
+
 
     def statusBarUpdate(self, message):
         if type(message)== list:
@@ -263,7 +267,8 @@ class Config():
                 'DefaultVersion': '20180930',
                 'Port': '7915',
                 'Host': 'localhost',
-                'USername': 'radar'
+                'Username': 'radar',
+                'GroundFeatures': json.dumps({'ILS[CJAP]':'ILS', 'ILS2[CJAP]':'ILS', 'LDA[CJAP]':'NDB'}),
             }
             self.config.write(open('config.ini', 'w'))
         
@@ -273,6 +278,7 @@ class Config():
         self.port = self.config['QRadar']['Port']
         self.host = self.config['QRadar']['Host']
         self.username = self.config['QRadar']['Username']
+        self.groundFeatures = json.loads(self.config['QRadar']['GroundFeatures'])
         
         
 
@@ -306,6 +312,9 @@ class Config():
     def setUsername(self, username):
         self.config['QRadar']['Username'] = username
         self.config.write(open('config.ini', 'w'))
+    
+    def getGroundFeatures(self):
+        return self.groundFeatures
         
 
 class LoginForm(QDialog):
@@ -936,8 +945,6 @@ class MenuWindow(QWidget):
             self.windScene.update()
 
 
-
-
 class EditCallsignDialog(QDialog):
     def __init__(self, currentPlane, parent=None):
         super(EditCallsignDialog, self).__init__(parent)
@@ -1008,7 +1015,7 @@ class PlaneSymbol(QGraphicsItem):
 
         painter.setFont(QFont("Arial", 8))
         painter.drawText(6, 10, self.callsign)
-        painter.drawText(6, 18, 'FL' + mToFL(self.altitude))
+        painter.drawText(6, 25, 'FL' + mToFL(self.altitude))
         painter.setPen(QPen(Qt.white))
 
         arrowsvg = QSvgRenderer(":icons/arrow.svg")
@@ -1020,7 +1027,7 @@ class PlaneSymbol(QGraphicsItem):
             arrowsvg.render(painter, QRectF(-4, -16, 4, 8))
             painter.rotate(-180)
 
-        painter.drawText(6, 28, str(int(self.speed * 1.94384)) + 'kts')
+        painter.drawText(6, 40, str(int(self.speed * 1.94384)) + 'kts')
 
         if self.clicked:
             painter.setPen(QPen(Qt.white))
@@ -1051,7 +1058,7 @@ class GroundSymbol(QGraphicsItem):
         painter.setPen(QPen(Qt.white))
         painter.setFont(QFont("Arial",8))
         painter.drawText(6,10,self.name)
-        painter.drawText(0,20,self.type)
+        painter.drawText(0,30,self.type)
         pen = QPen(Qt.white)
         pen.setWidth(1)
         painter.setPen(pen)
@@ -1247,6 +1254,9 @@ class FlightDirector():
 
     def sendMessage(self, message):
         self.client.sendMessage(message)
+    
+    def updateNavTypes(self,navTypes):
+        self.client.updateNavTypes(navTypes)
 
 
 def mToNm(m):
@@ -1469,7 +1479,7 @@ def updateBasemap(mainWindow):
             colour = QColor(80,80,80)
         colour = colour.toHsv()
         h, s, v, a = colour.getHsv()
-        colour.setHsv(h, s/3, v/3, a)
+        colour.setHsv(int(h), int(s/3), int(v/3), int(a))
         pen = QPen(colour)
         brush = QBrush(colour)
         
@@ -1544,9 +1554,13 @@ def updateNav(mainWindow, nav):
     navSymbol.rotation = nav.rotation
          
     nav.symbol = navSymbol
-    if nav.type == "ILS":
-        polygonLight = QPolygonF([QPointF(-50,0),QPointF(-50,9260),QPointF(-300,9260+100),QPointF(-50,0)])
-        polygonDark = QPolygonF([QPointF(-50,0),QPointF(-50,9260),QPointF(250,9260+100),QPointF(-50,0)])
+    if nav.type == "ILS": # Classing LDAs as NDBs for now...
+        if nav.type == "ILS":
+            offset = -50
+        else:
+            offset = 0
+        polygonLight = QPolygonF([QPointF(offset,0),QPointF(offset,9260),QPointF(-300,9260+100),QPointF(offset,0)])
+        polygonDark = QPolygonF([QPointF(offset,0),QPointF(offset,9260),QPointF(250,9260+100),QPointF(offset,0)])
         transform = QTransform()
         transform.translate(nav.x,nav.z)
         transform.rotate(nav.rotation)
